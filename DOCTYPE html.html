@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web Games 2.0</title>
+  <style>
+    /* ==========================================
+       THEMING & STYLING
+       ========================================== */
+    :root {
+      --bg-color: #0d0b18;        /* Deep void purple */
+      --panel-bg: #161224;       /* Dark purple sidebar & header */
+      --card-bg: #1e1832;        /* Button & item background */
+      --accent-color: #7c3aed;   /* Electric purple primary accent */
+      --accent-hover: #8b5cf6;   /* Bright purple hover */
+      --text-primary: #f5f3ff;   /* Soft lavender white */
+      --text-secondary: #9ca3af; /* Muted slate text */
+      --border-color: #27203d;   /* Dark violet borders */
+      --sidebar-width: 250px;
+      --topbar-height: 52px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-primary);
+      height: 100vh;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ==========================================
+       SIDEBAR UI & SEARCH BAR
+       ========================================== */
+    #sidebar {
+      width: var(--sidebar-width);
+      background-color: var(--panel-bg);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+    }
+
+    .sidebar-header {
+      padding: 1.25rem 1rem 0.75rem 1rem;
+      background: linear-gradient(180deg, rgba(124, 58, 237, 0.15) 0%, rgba(0, 0, 0, 0) 100%);
+    }
+
+    .sidebar-header h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: 0.5px;
+    }
+
+    .search-container {
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .search-input {
+      width: 100%;
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 0.45rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent-hover);
+    }
+
+    .search-input::placeholder {
+      color: var(--text-secondary);
+    }
+
+    .game-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.75rem 0.5rem;
+      list-style: none;
+    }
+
+    .game-item {
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.4rem;
+      border-radius: 8px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-weight: 500;
+      font-size: 0.9rem;
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
+    }
+
+    .game-item:hover {
+      background-color: var(--card-bg);
+      color: var(--text-primary);
+      border-color: var(--border-color);
+    }
+
+    .game-item.active {
+      background-color: var(--accent-color);
+      color: #ffffff;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35);
+      border-color: var(--accent-hover);
+    }
+
+    .no-results {
+      padding: 1rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
+    /* ==========================================
+       PLAYER & CONTROLS UI
+       ========================================== */
+    #main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .top-bar {
+      height: var(--topbar-height);
+      background-color: var(--panel-bg);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1.25rem;
+    }
+
+    .game-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--text-primary);
+    }
+
+    .controls {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .btn {
+      background-color: var(--card-bg);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      padding: 0.45rem 0.85rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      background-color: var(--accent-color);
+      border-color: var(--accent-hover);
+      box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+    }
+
+    .iframe-container {
+      flex: 1;
+      position: relative;
+      background-color: #000000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    iframe {
+      border: none;
+      display: block;
+      transition: all 0.2s ease;
+    }
+
+    /* ASPECT RATIO MODES */
+    .ratio-4-3 {
+      aspect-ratio: 4 / 3;
+      width: 100%;
+      height: 100%;
+      max-width: calc((100vh - var(--topbar-height)) * (4 / 3));
+      max-height: calc((100vw - var(--sidebar-width)) * (3 / 4));
+    }
+
+    .ratio-16-9 {
+      aspect-ratio: 16 / 9;
+      width: 100%;
+      height: 100%;
+      max-width: calc((100vh - var(--topbar-height)) * (16 / 9));
+      max-height: calc((100vw - var(--sidebar-width)) * (9 / 16));
+    }
+
+    .ratio-freeform {
+      width: 100%;
+      height: 100%;
+    }
+
+    .placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      background-color: var(--bg-color);
+      z-index: 5;
+    }
+
+    /* ==========================================
+       CLOUD SAVE MODAL STYLES
+       ========================================== */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-box {
+      background-color: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      padding: 2rem;
+      border-radius: 12px;
+      max-width: 420px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-box h2 {
+      margin-bottom: 0.5rem;
+      font-size: 1.25rem;
+    }
+
+    .modal-box p {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .warning-text {
+      color: #f59e0b;
+      font-size: 0.78rem;
+      font-weight: 500;
+      margin-bottom: 1.25rem;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .input-group input {
+      flex: 1;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 0.5rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .input-group input:focus {
+      border-color: var(--accent-hover);
+    }
+
+    .btn-primary {
+      background: var(--accent-color);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s ease;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-secondary {
+      width: 100%;
+      background: var(--card-bg);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      padding: 0.6rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent-hover);
+    }
+
+    .divider {
+      margin: 1.25rem 0;
+      border-bottom: 1px solid var(--border-color);
+      line-height: 0.1em;
+    }
+
+    .divider span {
+      background: var(--panel-bg);
+      padding: 0 10px;
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+    }
+
+    .status-msg {
+      margin-top: 10px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      min-height: 1.2em;
+    }
+  </style>
+</head>
+<body>
+
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <h2>🎮 Web Games 2.0</h2>
+    </div>
+    <div class="search-container">
+      <input 
+        type="text" 
+        id="searchInput" 
+        class="search-input" 
+        placeholder="🔍 Search games..." 
+        oninput="filterGames()"
+      >
+    </div>
+    <ul class="game-list" id="gameList"></ul>
+  </aside>
+
+  <main id="main-content">
+    <div class="top-bar">
+      <span class="game-title" id="activeTitle">Select a Game</span>
+      <div class="controls">
+        <button class="btn" onclick="openModal()">☁️ Cloud Profile</button>
+        <button class="btn" onclick="reloadGame()">Reload</button>
+        <button class="btn" onclick="toggleFullscreen()">Fullscreen</button>
+      </div>
+    </div>
+
+    <div class="iframe-container" id="playerContainer">
+      <div class="placeholder" id="placeholder">Select a game from the sidebar to start playing.</div>
+      <iframe 
+        id="gameFrame" 
+        allow="fullscreen; autoplay; keyboard-trap" 
+        allowfullscreen="true" 
+        webkitallowfullscreen="true" 
+        mozallowfullscreen="true"
+        src="about:blank">
+      </iframe>
+    </div>
+  </main>
+
+  <!-- CLOUD SAVE MODAL OVERLAY -->
+  <div id="cloudModal" class="modal-overlay">
+    <div class="modal-box">
+      <h2>☁️ Firebase Cloud Profile</h2>
+      <p>Enter your Cloud Save Key to sync progress, or generate a new key to start fresh.</p>
+      <p class="warning-text">⚠️ Progress automatically syncs to Firebase Firestore.</p>
+      
+      <div class="input-group">
+        <input type="text" id="cloudKeyInput" placeholder="Paste Cloud Save Key here...">
+        <button class="btn-primary" onclick="useExistingKey()">Load</button>
+      </div>
+
+      <div id="modalStatusMsg" class="status-msg"></div>
+
+      <div class="divider"><span>OR</span></div>
+
+      <button class="btn-secondary" onclick="createNewKey()">✨ Create New Cloud Save Key</button>
+
+      <div id="keyDisplayArea" style="display: none; margin-top: 15px;">
+        <p style="color: #4ade80; font-size: 0.85rem; margin-bottom: 5px;">New Key Created! Save this key:</p>
+        <input type="text" id="newGeneratedKey" readonly style="width: 100%; padding: 6px; text-align: center; margin-bottom: 10px; background: var(--card-bg); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px;">
+        <button class="btn-primary" style="width: 100%;" onclick="startPlaying()">Continue to Games</button>
+      </div>
+
+      <p style="margin-top: 15px; margin-bottom: 0;">
+        <a href="#" onclick="event.preventDefault(); closeModal();" style="color: var(--text-secondary); font-size: 0.75rem; text-decoration: underline;">Skip for now</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- FIREBASE IMPORTS -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDMMKjfnB1IXjO-PIa6BTIboAJwoYp9vY4",
+      authDomain: "bubblecloud-38185.firebaseapp.com",
+      projectId: "bubblecloud-38185",
+      storageBucket: "bubblecloud-38185.firebasestorage.app",
+      messagingSenderId: "543089433151",
+      appId: "1:543089433151:web:c200a172c3fe8db286368a",
+      measurementId: "G-G2JHE6VJTL"
+    };
+
+    try {
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      window.db = db;
+      window.doc = doc;
+      window.setDoc = setDoc;
+      window.getDoc = getDoc;
+
+      console.log("🔥 Firebase initialized successfully!");
+    } catch(err) {
+      console.error("Firebase Initialization Error:", err);
+    }
+  </script>
+
+  <script>
+    /* =========================================================================
+       CLOUD SAVE SYSTEM (FIREBASE FIRESTORE)
+       ========================================================================= */
+    let activeUserKey = localStorage.getItem('activeCloudKey') || null;
+
+    function serializeForFirestore(val) {
+      if (val === null || val === undefined) return null;
+
+      const strTag = Object.prototype.toString.call(val);
+      const isBinary = strTag.includes('Array]') || strTag.includes('Buffer]') || ArrayBuffer.isView(val) || val instanceof ArrayBuffer;
+
+      if (isBinary) {
+        try {
+          let bytes;
+          if (val instanceof ArrayBuffer) {
+            bytes = new Uint8Array(val);
+          } else if (val.buffer) {
+            bytes = new Uint8Array(val.buffer, val.byteOffset || 0, val.byteLength || val.length);
+          } else {
+            bytes = new Uint8Array(val);
+          }
+          let binary = '';
+          for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          return {
+            __isBinary: true,
+            ctor: val.constructor ? val.constructor.name : 'Uint8Array',
+            b64: btoa(binary)
+          };
+        } catch (e) {
+          return null;
+        }
+      }
+
+      if (Array.isArray(val)) {
+        return val.map(serializeForFirestore);
+      }
+
+      if (typeof val === 'object') {
+        const plainObj = {};
+        for (const k of Object.keys(val)) {
+          plainObj[k] = serializeForFirestore(val[k]);
+        }
+        return plainObj;
+      }
+
+      return val;
+    }
+
+    window.addEventListener('message', async (event) => {
+      if (!event.data || !event.data.key || !event.data.game) return;
+
+      const { key, game } = event.data;
+      const safeGameKey = game.replace(/[^a-zA-Z0-9_]/g, '_');
+
+      if (event.data.type === 'SAVE_LOCALSTORAGE_TO_FIREBASE') {
+        const saves = event.data.saves;
+        try {
+          if (window.db && window.doc && window.setDoc) {
+            const docRef = window.doc(window.db, "user_saves", key);
+            await window.setDoc(docRef, { [safeGameKey]: { localSaves: saves } }, { merge: true });
+            console.log("🔥 LocalStorage synced to Firebase!");
+          }
+        } catch (err) {
+          console.error("Firebase LocalStorage sync error:", err);
+        }
+      }
+
+      if (event.data.type === 'SAVE_INDEXEDDB_TO_FIREBASE') {
+        const idbSaves = serializeForFirestore(event.data.idbSaves);
+        try {
+          if (window.db && window.doc && window.setDoc) {
+            const docRef = window.doc(window.db, "user_saves", key);
+            await window.setDoc(docRef, { [safeGameKey]: { idbSaves: idbSaves } }, { merge: true });
+            console.log("🔥 IndexedDB synced to Firebase!");
+          }
+        } catch (err) {
+          console.error("Firebase IndexedDB sync error:", err);
+        }
+      }
+    });
+
+    async function useExistingKey() {
+      const statusMsg = document.getElementById('modalStatusMsg');
+      statusMsg.style.color = '#ef4444'; 
+      statusMsg.textContent = '';
+
+      const inputKey = document.getElementById('cloudKeyInput').value.trim();
+      
+      if (!inputKey) {
+        statusMsg.textContent = "Invalid code";
+        return;
+      }
+
+      let retries = 0;
+      while ((!window.db || !window.doc || !window.getDoc) && retries < 20) {
+        await new Promise(r => setTimeout(r, 100));
+        retries++;
+      }
+
+      if (!window.db) {
+        statusMsg.textContent = "Firebase connection timed out. Check credentials.";
+        return;
+      }
+
+      try {
+        const docRef = window.doc(window.db, "user_saves", inputKey);
+        const docSnap = await window.getDoc(docRef);
+
+        if (!docSnap.exists()) {
+          statusMsg.textContent = "Save key not found in cloud";
+          return;
+        }
+
+        activeUserKey = inputKey;
+        localStorage.setItem('activeCloudKey', activeUserKey);
+
+        statusMsg.style.color = '#4ade80';
+        statusMsg.textContent = "Cloud save key verified!";
+
+        setTimeout(() => {
+          closeModal();
+          statusMsg.textContent = '';
+          if (activeGameObj) reloadGame();
+        }, 1200);
+
+      } catch (err) {
+        console.error("Firebase Key Check Error:", err);
+        statusMsg.textContent = "Error accessing Firebase";
+      }
+    }
+
+    async function createNewKey() {
+      const statusMsg = document.getElementById('modalStatusMsg');
+      statusMsg.textContent = '';
+
+      let retries = 0;
+      while ((!window.db || !window.doc || !window.setDoc) && retries < 20) {
+        await new Promise(r => setTimeout(r, 100));
+        retries++;
+      }
+
+      if (!window.db || !window.doc || !window.setDoc) {
+        statusMsg.style.color = '#ef4444';
+        statusMsg.textContent = "Firebase is connecting. Please wait a second.";
+        return;
+      }
+
+      try {
+        activeUserKey = 'user_' + Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 6);
+        
+        const docRef = window.doc(window.db, "user_saves", activeUserKey);
+        await window.setDoc(docRef, { _created: new Date().toISOString() }, { merge: true });
+
+        localStorage.setItem('activeCloudKey', activeUserKey);
+
+        document.getElementById('newGeneratedKey').value = activeUserKey;
+        document.getElementById('keyDisplayArea').style.display = 'block';
+      } catch (err) {
+        statusMsg.style.color = '#ef4444';
+        statusMsg.textContent = "Error saving key to Firebase";
+        console.error("Firebase Key Creation Error:", err);
+      }
+    }
+
+    function openModal() {
+      document.getElementById('modalStatusMsg').textContent = '';
+      if (activeUserKey) {
+        document.getElementById('cloudKeyInput').value = activeUserKey;
+      }
+      document.getElementById('cloudModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('modalStatusMsg').textContent = '';
+      document.getElementById('cloudModal').style.display = 'none';
+    }
+
+    function startPlaying() {
+      closeModal();
+      if (activeGameObj) reloadGame();
+    }
+
+    /* =========================================================================
+       DEVELOPER CONFIGURATION
+       ========================================================================= */
+    const GAMES_CONFIG = [
+      {
+        title: "Block Blast",
+        url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/block-blast/index.html",
+        aspectRatio: 3
+      },
+      {
+        title: "Drive Mad",
+        url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/drive-mad/index.html",
+        aspectRatio: 3
+      },
+      {
+        title: "Google Baseball",
+        url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/googlebaseball/index.html",
+        aspectRatio: 2
+      },
+      {
+        title: "Pokémon Johto Legends",
+        url: "https://raw.githubusercontent.com/seemonster202-stack/BubbleGames/refs/heads/main/PJL/PJL%200.2.2%20(Dev%20Build%205).html",
+        aspectRatio: 1
+      },   
+      {
+        title: "Poor Bunny",
+        url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/poor-bunny/index.html",
+        aspectRatio: 3
+      },
+      {
+        title: "Slope",
+        url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/slope/index.html",
+        aspectRatio: 3
+      },
+      {
+        title: "Slow Roads",
+        url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/slow-roads/index.html",
+        aspectRatio: 3
+      },
+      {
+        title: "Super Liquid Soccer",
+        url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/super-liquid-soccer/index.html",
+        aspectRatio: 2
+      } 
+    ];
+
+    /* =========================================================================
+       PLAYER LOGIC
+       ========================================================================= */
+    let activeGameObj = null;
+
+    function renderList(gamesToRender) {
+      const listContainer = document.getElementById('gameList');
+      listContainer.innerHTML = '';
+
+      if (gamesToRender.length === 0) {
+        listContainer.innerHTML = '<li class="no-results">No games match your search.</li>';
+        return;
+      }
+
+      gamesToRender.forEach((game) => {
+        const li = document.createElement('li');
+        li.className = 'game-item';
+        
+        if (activeGameObj && activeGameObj.title === game.title) {
+          li.classList.add('active');
+        }
+        
+        li.textContent = game.title;
+        li.onclick = () => loadGame(game, li);
+        listContainer.appendChild(li);
+      });
+    }
+
+    function filterGames() {
+      const query = document.getElementById('searchInput').value.toLowerCase().trim();
+      const filtered = GAMES_CONFIG.filter(game => game.title.toLowerCase().includes(query));
+      renderList(filtered);
+    }
+
+    async function loadGame(game, element) {
+      if (element) {
+        document.querySelectorAll('.game-item').forEach(el => el.classList.remove('active'));
+        element.classList.add('active');
+      }
+
+      activeGameObj = game;
+      document.getElementById('activeTitle').textContent = game.title;
+      
+      const placeholder = document.getElementById('placeholder');
+      const frame = document.getElementById('gameFrame');
+      
+      frame.className = '';
+      frame.removeAttribute('srcdoc');
+      frame.src = 'about:blank';
+
+      switch (game.aspectRatio) {
+        case 1: frame.classList.add('ratio-4-3'); break;
+        case 2: frame.classList.add('ratio-16-9'); break;
+        case 3: default: frame.classList.add('ratio-freeform'); break;
+      }
+
+      placeholder.style.display = 'flex';
+      placeholder.textContent = 'Preparing game files...';
+
+      try {
+        let gameLocalSaves = {};
+        let gameIdbSaves = {};
+        const safeGameKey = game.title.replace(/[^a-zA-Z0-9_]/g, '_');
+
+        if (activeUserKey) {
+          let retries = 0;
+          while ((!window.db || !window.doc || !window.getDoc) && retries < 20) {
+            await new Promise(r => setTimeout(r, 100));
+            retries++;
+          }
+
+          if (window.db && window.doc && window.getDoc) {
+            try {
+              const docRef = window.doc(window.db, "user_saves", activeUserKey);
+              const docSnap = await window.getDoc(docRef);
+              
+              if (docSnap.exists() && docSnap.data()[safeGameKey]) {
+                const gameData = docSnap.data()[safeGameKey];
+                gameLocalSaves = gameData.localSaves || {};
+                gameIdbSaves = gameData.idbSaves || {};
+              }
+            } catch(e) {
+              console.warn("Firestore save fetch error:", e);
+            }
+          }
+        }
+
+        const response = await fetch(game.url);
+        if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+        
+        let rawHtml = await response.text();
+        const baseUrl = game.url.substring(0, game.url.lastIndexOf('/') + 1);
+
+        // Defer script tags in raw HTML so they wait for cloud save import
+        rawHtml = rawHtml.replace(/<script\b/gi, '<script type="text/lazy-script"');
+
+        const preloadedLocalJson = JSON.stringify(gameLocalSaves);
+        const preloadedIdbJson = JSON.stringify(gameIdbSaves);
+
+        const cloudSaveBootstrap = `
+          <script>
+            (function() {
+              const CLOUD_KEY = "${activeUserKey || ''}";
+              const GAME_NAME = "${game.title.replace(/"/g, '\\"').replace(/'/g, "\\'")}";
+              const PRELOADED_LOCAL = ${preloadedLocalJson};
+              const PRELOADED_IDB = ${preloadedIdbJson};
+              const trackedDBNames = new Set();
+
+              function encodeKeyForFirestore(key) {
+                return String(key).replace(/\\//g, '___SLASH___').replace(/\\./g, '___DOT___');
+              }
+              function decodeKeyFromFirestore(key) {
+                return String(key).replace(/___SLASH___/g, '/').replace(/___DOT___/g, '.');
+              }
+
+              function deserializeFromFirestore(val) {
+                if (val === null || typeof val !== 'object') return val;
+                if (val.__isBinary && val.b64) {
+                  const binary = atob(val.b64);
+                  const bytes = new Uint8Array(binary.length);
+                  for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                  }
+                  const Ctor = window[val.ctor] || Uint8Array;
+                  return new Ctor(bytes.buffer);
+                }
+                if (Array.isArray(val)) return val.map(deserializeFromFirestore);
+                const obj = {};
+                for (const k of Object.keys(val)) {
+                  obj[k] = deserializeFromFirestore(val[k]);
+                }
+                return obj;
+              }
+
+              /* 1. RESTORE LOCALSTORAGE */
+              try {
+                Object.keys(PRELOADED_LOCAL).forEach(k => {
+                  localStorage.setItem(k, PRELOADED_LOCAL[k]);
+                });
+              } catch(e) {}
+
+              let localSaveTimeout;
+              const originalSetItem = localStorage.setItem.bind(localStorage);
+              localStorage.setItem = function(key, value) {
+                originalSetItem(key, value);
+                if (!CLOUD_KEY) return;
+                clearTimeout(localSaveTimeout);
+                localSaveTimeout = setTimeout(() => {
+                  try {
+                    const currentData = {};
+                    for (let i = 0; i < localStorage.length; i++) {
+                      const k = localStorage.key(i);
+                      currentData[k] = localStorage.getItem(k);
+                    }
+                    window.parent.postMessage({
+                      type: 'SAVE_LOCALSTORAGE_TO_FIREBASE',
+                      key: CLOUD_KEY,
+                      game: GAME_NAME,
+                      saves: currentData
+                    }, '*');
+                  } catch(err) {}
+                }, 1500);
+              };
+
+              /* 2. RESTORE INDEXEDDB */
+              async function importAllIDB(preloadedData) {
+                if (!preloadedData || Object.keys(preloadedData).length === 0) return;
+                
+                for (const [rawDbName, dbData] of Object.entries(preloadedData)) {
+                  if (!dbData || !dbData.stores) continue;
+                  const dbName = decodeKeyFromFirestore(rawDbName);
+                  trackedDBNames.add(dbName);
+                  
+                  await new Promise((resolve) => {
+                    const req = indexedDB.open(dbName, dbData.version || 1);
+                    
+                    req.onupgradeneeded = (e) => {
+                      const db = e.target.result;
+                      Object.keys(dbData.stores).forEach(rawStoreName => {
+                        const storeName = decodeKeyFromFirestore(rawStoreName);
+                        if (!db.objectStoreNames.contains(storeName)) {
+                          db.createObjectStore(storeName);
+                        }
+                      });
+                    };
+
+                    req.onsuccess = (e) => {
+                      const db = e.target.result;
+                      const rawStoreNames = Object.keys(dbData.stores);
+                      if (rawStoreNames.length === 0) { db.close(); return resolve(); }
+                      
+                      try {
+                        const realStoreNames = rawStoreNames.map(decodeKeyFromFirestore);
+                        const tx = db.transaction(realStoreNames, 'readwrite');
+                        
+                        rawStoreNames.forEach(rawStoreName => {
+                          const storeName = decodeKeyFromFirestore(rawStoreName);
+                          const store = tx.objectStore(storeName);
+                          dbData.stores[rawStoreName].forEach(item => {
+                            const restoredValue = deserializeFromFirestore(item.value);
+                            const restoredKey = deserializeFromFirestore(item.key);
+                            try {
+                              if (store.keyPath) {
+                                store.put(restoredValue);
+                              } else {
+                                store.put(restoredValue, restoredKey);
+                              }
+                            } catch(err) {
+                              console.warn("Restore store put failed:", storeName, err);
+                            }
+                          });
+                        });
+                        tx.oncomplete = () => { db.close(); resolve(); };
+                        tx.onerror = () => { db.close(); resolve(); };
+                      } catch(err) {
+                        db.close();
+                        resolve();
+                      }
+                    };
+                    req.onerror = () => resolve();
+                  });
+                }
+              }
+
+              /* 3. EXPORT & SYNC INDEXEDDB */
+              async function exportAllIDB() {
+                if (!window.indexedDB) return null;
+                let dbList = Array.from(trackedDBNames);
+                try {
+                  if (window.indexedDB.databases) {
+                    const found = await window.indexedDB.databases();
+                    found.forEach(d => { if (d.name) trackedDBNames.add(d.name); });
+                    dbList = Array.from(trackedDBNames);
+                  }
+                } catch(e) {}
+
+                if (dbList.length === 0) return null;
+                const exportData = {};
+                for (const dbName of dbList) {
+                  const data = await exportSingleIDB(dbName);
+                  if (data) {
+                    const safeDbName = encodeKeyForFirestore(dbName);
+                    exportData[safeDbName] = data;
+                  }
+                }
+                return exportData;
+              }
+
+              function exportSingleIDB(dbName) {
+                return new Promise((resolve) => {
+                  const req = indexedDB.open(dbName);
+                  req.onerror = () => resolve(null);
+                  req.onsuccess = (e) => {
+                    const db = e.target.result;
+                    const version = db.version;
+                    const storeNames = Array.from(db.objectStoreNames);
+                    if (storeNames.length === 0) { db.close(); return resolve({ version, stores: {} }); }
+                    
+                    try {
+                      const tx = db.transaction(storeNames, 'readonly');
+                      const dbData = { version, stores: {} };
+                      let pending = storeNames.length;
+
+                      storeNames.forEach(storeName => {
+                        const safeStoreName = encodeKeyForFirestore(storeName);
+                        const store = tx.objectStore(storeName);
+                        const getAllValReq = store.getAll();
+                        const getAllKeyReq = store.getAllKeys();
+
+                        Promise.all([
+                          new Promise(r => { getAllValReq.onsuccess = () => r(getAllValReq.result); getAllValReq.onerror = () => r([]); }),
+                          new Promise(r => { getAllKeyReq.onsuccess = () => r(getAllKeyReq.result); getAllKeyReq.onerror = () => r([]); })
+                        ]).then(([values, keys]) => {
+                          dbData.stores[safeStoreName] = keys.map((key, i) => ({
+                            key: key,
+                            value: values[i]
+                          }));
+                          pending--;
+                          if (pending === 0) {
+                            db.close();
+                            resolve(dbData);
+                          }
+                        });
+                      });
+                    } catch(err) {
+                      db.close();
+                      resolve(null);
+                    }
+                  };
+                });
+              }
+
+              let idbSaveTimeout;
+              function triggerIDBSync() {
+                if (!CLOUD_KEY) return;
+                clearTimeout(idbSaveTimeout);
+                idbSaveTimeout = setTimeout(async () => {
+                  const idbData = await exportAllIDB();
+                  if (idbData && Object.keys(idbData).length > 0) {
+                    window.parent.postMessage({
+                      type: 'SAVE_INDEXEDDB_TO_FIREBASE',
+                      key: CLOUD_KEY,
+                      game: GAME_NAME,
+                      idbSaves: idbData
+                    }, '*');
+                  }
+                }, 2000);
+              }
+
+              if (window.IDBObjectStore) {
+                const origPut = IDBObjectStore.prototype.put;
+                IDBObjectStore.prototype.put = function() {
+                  triggerIDBSync();
+                  return origPut.apply(this, arguments);
+                };
+                const origAdd = IDBObjectStore.prototype.add;
+                IDBObjectStore.prototype.add = function() {
+                  triggerIDBSync();
+                  return origAdd.apply(this, arguments);
+                };
+              }
+
+              if (window.indexedDB) {
+                const origOpen = indexedDB.open.bind(indexedDB);
+                indexedDB.open = function(name, version) {
+                  if (name) trackedDBNames.add(name);
+                  return origOpen(name, version);
+                };
+              }
+
+              /* 4. LAUNCH GAME AFTER RESTORE COMPLETES */
+              async function launchGameEngine() {
+                await importAllIDB(PRELOADED_IDB);
+                console.log("✅ IndexedDB Cloud Restore Ready. Launching game scripts...");
+
+                const lazyScripts = Array.from(document.querySelectorAll('script[type="text/lazy-script"]'));
+                for (const scriptEl of lazyScripts) {
+                  await new Promise((resolve) => {
+                    const newScript = document.createElement('script');
+                    Array.from(scriptEl.attributes).forEach(attr => {
+                      if (attr.name !== 'type') newScript.setAttribute(attr.name, attr.value);
+                    });
+                    newScript.textContent = scriptEl.textContent;
+                    
+                    if (newScript.src) {
+                      newScript.onload = resolve;
+                      newScript.onerror = resolve;
+                      scriptEl.parentNode.replaceChild(newScript, scriptEl);
+                    } else {
+                      scriptEl.parentNode.replaceChild(newScript, scriptEl);
+                      resolve();
+                    }
+                  });
+                }
+              }
+
+              if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', launchGameEngine);
+              } else {
+                launchGameEngine();
+              }
+            })();
+          <\/script>
+        `;
+
+        const injectedHeader = `<base href="${baseUrl}">${cloudSaveBootstrap}`;
+
+        if (rawHtml.includes('<head>')) {
+          rawHtml = rawHtml.replace('<head>', `<head>${injectedHeader}`);
+        } else {
+          rawHtml = injectedHeader + rawHtml;
+        }
+
+        frame.srcdoc = rawHtml;
+        placeholder.style.display = 'none';
+      } catch (err) {
+        console.error('Fetch Error:', err);
+        placeholder.textContent = 'Failed to load game. Check URL or network permissions.';
+      }
+    }
+
+    function reloadGame() {
+      if (activeGameObj) {
+        loadGame(activeGameObj, null);
+      }
+    }
+
+    async function toggleFullscreen() {
+      if (!activeGameObj) {
+        alert('Please select a game first.');
+        return;
+      }
+
+      const newTab = window.open('about:blank', '_blank');
+      if (!newTab) {
+        alert('Please allow popups to open the game in full screen.');
+        return;
+      }
+
+      newTab.document.title = activeGameObj.title;
+      newTab.document.body.style.margin = '0';
+      newTab.document.body.style.height = '100vh';
+      newTab.document.body.style.overflow = 'hidden';
+      newTab.document.body.style.backgroundColor = '#000000';
+
+      const iframe = newTab.document.createElement('iframe');
+      iframe.style.border = 'none';
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.setAttribute('allow', 'fullscreen; autoplay; keyboard-trap');
+      newTab.document.body.appendChild(iframe);
+
+      try {
+        const response = await fetch(activeGameObj.url);
+        if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+        
+        let rawHtml = await response.text();
+        const baseUrl = activeGameObj.url.substring(0, activeGameObj.url.lastIndexOf('/') + 1);
+        const baseTag = `<base href="${baseUrl}">`;
+
+        if (rawHtml.includes('<head>')) {
+          rawHtml = rawHtml.replace('<head>', `<head>${baseTag}`);
+        } else {
+          rawHtml = baseTag + rawHtml;
+        }
+
+        iframe.srcdoc = rawHtml;
+      } catch (err) {
+        console.error('Fullscreen Launch Error:', err);
+        newTab.document.body.innerHTML = '<div style="color: white; padding: 20px; font-family: sans-serif;">Failed to load game content.</div>';
+      }
+    }
+
+    window.onload = () => {
+      renderList(GAMES_CONFIG);
+    };
+  </script>
+</body>
+</html>
