@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Launcher</title>
+<style>
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: radial-gradient(circle at top right, #1d183a 0%, #0d0b18 60%);
+    background-color: #0d0b18;
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+}
+
+/* Header branding */
+.brand {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.brand h1 {
+    font-size: 42px;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -1px;
+    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.brand p {
+    font-family: monospace;
+    color: #e6df53;
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    margin-top: 6px;
+}
+
+#buttons {
+    display: flex;
+    gap: 24px;
+}
+
+.launchCol {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, #1c1936 0%, #141126 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 32px 40px;
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+}
+
+.launch-btn {
+    padding: 20px 48px;
+    font-size: 24px;
+    font-weight: 700;
+    color: #ffffff;
+    background: linear-gradient(135deg, #252147 0%, #191630 100%);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.launch-btn:hover {
+    background: linear-gradient(135deg, #322b5e 0%, #201c3d 100%);
+    transform: translateY(-3px);
+    border-color: rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.launch-btn.default {
+    border-color: #e6df53;
+    box-shadow: 0 0 20px rgba(230, 223, 83, 0.25);
+}
+
+#hint {
+    color: #8c89a0;
+    font-size: 13px;
+    font-family: monospace;
+    text-align: center;
+    letter-spacing: 0.5px;
+}
+
+.toggleGroup {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #b0aec4;
+    font-size: 14px;
+    font-weight: 500;
+    user-select: none;
+}
+
+.toggleGroup span.active {
+    color: #e6df53;
+    font-weight: bold;
+}
+
+.switch {
+    position: relative;
+    width: 52px;
+    height: 28px;
+}
+
+.switch input { display: none; }
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: #17142b;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 28px;
+    transition: 0.25s;
+}
+
+.slider::before {
+    content: "";
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    left: 3px;
+    top: 3px;
+    background: #b0aec4;
+    border-radius: 50%;
+    transition: 0.25s;
+}
+
+input:checked + .slider {
+    background: #252147;
+    border-color: #e6df53;
+}
+
+input:checked + .slider::before {
+    transform: translateX(24px);
+    background: #e6df53;
+    box-shadow: 0 0 8px rgba(230, 223, 83, 0.6);
+}
+</style>
+</head>
+<body>
+
+<div class="brand">
+    <h1>The Bubble</h1>
+    <p>&lt;&lt;&lt; Launcher &gt;&gt;&gt;</p>
+</div>
+
+<div id="buttons">
+    <div class="launchCol">
+        <button id="os" class="launch-btn">The Bubble</button>
+        <label class="toggleGroup">
+            <span id="labelOs">The Bubble</span>
+            <span class="switch">
+                <input type="checkbox" id="osToggle">
+                <span class="slider"></span>
+            </span>
+        </label>
+    </div>
+</div>
+
+<div id="hint">Enable switch to auto-open on next visit</div>
+
+<script>
+const OS_URL = "https://raw.githubusercontent.com/seemonster202-stack/BubbleGames/refs/heads/main/BubbleHub.html";
+const OS_KEY = "bubble_autolaunch_os";
+
+const osBtn = document.getElementById("os");
+const osToggle = document.getElementById("osToggle");
+const labelOs = document.getElementById("labelOs");
+
+function getEnabled(key, fallback) {
+    const v = localStorage.getItem(key);
+    return v === null ? fallback : v === "true";
+}
+
+function setEnabled(key, value) {
+    localStorage.setItem(key, value);
+}
+
+function applyUI() {
+    const osOn = getEnabled(OS_KEY, true); // Auto-launch BubbleGames by default
+    osToggle.checked = osOn;
+    labelOs.classList.toggle("active", osOn);
+    osBtn.classList.toggle("default", osOn);
+}
+
+osToggle.addEventListener("change", () => {
+    setEnabled(OS_KEY, osToggle.checked);
+    applyUI();
+    flashSaved(labelOs);
+});
+
+function flashSaved(labelEl) {
+    const original = labelEl.textContent;
+    labelEl.textContent = "The Bubble";
+    setTimeout(() => { labelEl.textContent = original; }, 900);
+}
+
+async function launch(url) {
+    const win = window.open("about:blank", "_blank");
+    if (!win) return;
+    try {
+        const code = await fetch(url + "?v=" + Date.now()).then(r => r.text());
+        win.document.open();
+        win.document.write(code);
+        win.document.close();
+    } catch (err) {
+        console.error("Launch failed:", err);
+    }
+}
+
+osBtn.onclick = () => launch(OS_URL);
+
+applyUI();
+
+window.onload = () => {
+    if (getEnabled(OS_KEY, true)) launch(OS_URL);
+};
+</script>
+</body>
+</html>
