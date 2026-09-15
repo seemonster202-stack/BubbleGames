@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Bubble</title>
+    <style>
+        /* Modern reset and font setup matching the clean, rounded look */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: radial-gradient(circle at top right, #1d183a 0%, #0d0b18 60%);
+            background-color: #0d0b18;
+            color: #ffffff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Top Navigation Bar */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 40px;
+            background: rgba(13, 11, 24, 0.7);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .logo-circle {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 2px solid #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        nav {
+            display: flex;
+            gap: 25px;
+        }
+
+        nav .nav-link {
+            color: #b0aec4;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-family: inherit;
+            transition: color 0.2s ease;
+        }
+
+        nav .nav-link:hover, nav .nav-link.active {
+            color: #ffffff;
+        }
+
+        nav .nav-link.disabled-link {
+            color: #4a4763;
+            cursor: not-allowed;
+        }
+
+        /* Hero Header section mimicking the styling from the image */
+        .hero {
+            text-align: center;
+            padding: 160px 20px 40px 20px;
+            position: relative;
+        }
+
+        /* Hide the hero section when not on the home view */
+        body:not(.home-active) .hero {
+            display: none;
+        }
+
+        .est-tag {
+            font-family: monospace;
+            color: #8c89a0;
+            font-size: 15px;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+
+        .main-title {
+            font-size: 84px;
+            font-weight: 800;
+            color: #ffffff;
+            margin: 0;
+            line-height: 1.1;
+            letter-spacing: -1px;
+            text-shadow: 4px 4px 0px rgba(0, 0, 0, 0.2);
+        }
+
+        .subtitle-badge {
+            background-color: #17142b;
+            color: #ffffff;
+            display: inline-block;
+            padding: 8px 30px;
+            border-radius: 30px;
+            margin-top: 15px;
+            font-size: 22px;
+            font-weight: 400;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        
+        .subtitle-badge em {
+            font-family: 'Georgia', serif;
+            font-style: italic;
+        }
+
+        .ticker-text {
+            font-family: monospace;
+            color: #e6df53;
+            margin-top: 25px;
+            font-size: 15px;
+            letter-spacing: 1px;
+        }
+
+        /* Content Sections Content Management Switcher */
+        .view-section {
+            display: none;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px 20px 80px 20px;
+        }
+
+        .view-section.active-view {
+            display: block;
+        }
+
+        /* Add top spacing to view section when hero title is hidden */
+        body:not(.home-active) .view-section.active-view {
+            padding-top: 100px;
+        }
+
+        .section-title {
+            font-size: 20px;
+            color: #ffffff;
+            margin-bottom: 25px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border-left: 4px solid #ffffff;
+            padding-left: 12px;
+        }
+
+        /* Home View Styles */
+        .home-layout {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .home-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .welcome-card, .sidebar-card {
+            background: linear-gradient(135deg, #1c1936 0%, #141126 100%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 30px;
+            border-radius: 14px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .welcome-card h3, .sidebar-card h3 {
+            font-size: 24px;
+            margin-bottom: 15px;
+            color: #ffffff;
+        }
+
+        .welcome-card p {
+            color: #b0aec4;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+
+        .featured-btn {
+            background-color: #ffffff;
+            color: #0d0b18;
+            border: none;
+            padding: 12px 24px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            transition: opacity 0.2s ease;
+        }
+
+        .featured-btn:hover {
+            opacity: 0.9;
+        }
+
+        .news-item {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 12px;
+            margin-bottom: 12px;
+        }
+
+        .news-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+            margin-bottom: 0;
+        }
+
+        .news-date {
+            font-size: 12px;
+            color: #8c89a0;
+            font-family: monospace;
+        }
+
+        .news-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 4px;
+            color: #e6df53;
+        }
+
+        /* Apps View Styles */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 20px;
+        }
+
+        .launcher-btn {
+            background: linear-gradient(135deg, #1c1936 0%, #141126 100%);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 24px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 14px;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 130px;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .launcher-btn:hover {
+            transform: translateY(-4px);
+            border-color: rgba(255, 255, 255, 0.25);
+            background: linear-gradient(135deg, #252147 0%, #191630 100%);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        .launcher-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-status {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #8c89a0;
+            font-weight: bold;
+        }
+
+        .launcher-btn:hover .btn-status {
+            color: #e6df53;
+        }
+    </style>
+</head>
+<body class="home-active">
+
+    <!-- Top Site Navigation Header -->
+    <header>
+        <div class="logo-area">
+            <div class="logo-circle">B</div>
+            <span>The Bubble</span>
+        </div>
+        <nav>
+            <button class="nav-link active" onclick="switchView('home', this)">Home</button>
+            <button class="nav-link" onclick="switchView('apps', this)">Apps</button>
+            <button class="nav-link disabled-link" disabled>Chat (Coming Soon)</button>
+        </nav>
+    </header>
+
+    <!-- Visual Banner Component -->
+    <section class="hero">
+        <div class="est-tag">&lt;&lt;&lt; Est. March 13, 2025 &gt;&gt;&gt;</div>
+        <h1 class="main-title">The Bubble</h1>
+        <div class="subtitle-badge">The site for <em>you</em></div>
+        <div class="ticker-text">cisco umbrella was the good ol' days</div>
+    </section>
+
+    <!-- Home Interface Section View -->
+    <main id="view-home" class="view-section active-view">
+        <h2 class="section-title">Announcements</h2>
+        <div class="home-layout">
+            <div class="welcome-card">
+                <h3>The New Bubble!</h3>
+                <p>Welcome to the New Bubble! This is an all new site with the same look and feel as the old one. This new version is designed to be untouchable by Lightspeed and anything inferior.</p>
+            </div>
+            <div class="sidebar-card">
+                <h3>Updates</h3>
+                <div class="news-item">
+                    <div class="news-date">Sep 17, 2026</div>
+                    <div class="news-title">The New Bubble Released!</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Apps Interface Section View -->
+    <main id="view-apps" class="view-section">
+        <h2 class="section-title">Apps</h2>
+        <div class="grid-container" id="button-container"></div>
+    </main>
+
+    <script>
+        // 1. ADD YOUR JSDELIVR HTML LINKS HERE
+        const gamesList = [
+            {
+                name: "Web Games 2.0",
+                url: "https://cdn.jsdelivr.net/gh/seemonster202-stack/BubbleGames@main/bubblegames.html"
+            },
+        ];
+
+        // 2. VIEW CONTROLLER ROUTING ENGINE
+        function switchView(viewId, element) {
+            // Remove active classes from navigation buttons
+            document.querySelectorAll('nav .nav-link').forEach(btn => btn.classList.remove('active'));
+            // Add active class to clicked button
+            element.classList.add('active');
+            // Hide all views
+            document.querySelectorAll('.view-section').forEach(view => view.classList.remove('active-view'));
+            // Show target view
+            document.getElementById(`view-${viewId}`).classList.add('active-view');
+
+            // Toggle state class on <body> to show or hide the hero section
+            if (viewId === 'home') {
+                document.body.classList.add('home-active');
+            } else {
+                document.body.classList.remove('home-active');
+            }
+        }
+
+        // 3. NETWORK ASYNC STORAGE ENGINE LAUNCHER
+        async function launchFromCDN(button, name, url) {
+            const statusLabel = button.querySelector(".btn-status");
+            const originalStatus = statusLabel.innerText;
+            button.disabled = true;
+            statusLabel.innerText = "Connecting...";
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+                const htmlContent = await response.text();
+                const newWindow = window.open("about:blank", "_blank");
+                if (newWindow) {
+                    newWindow.document.open();
+                    newWindow.document.write(htmlContent);
+                    newWindow.document.close();
+                } else {
+                    alert("Pop-up blocked! Allow pop-ups to open pages.");
+                }
+            } catch (error) {
+                console.error("Fetch failed:", error);
+                alert(`Error connecting to raw source for: ${name}`);
+            } finally {
+                button.disabled = false;
+                statusLabel.innerText = originalStatus;
+            }
+        }
+
+        // 4. GENERATE BUTTON CARDS ON THE APPS PAGE
+        const container = document.getElementById("button-container");
+        gamesList.forEach(game => {
+            const button = document.createElement("button");
+            button.className = "launcher-btn";
+            button.innerHTML = `<span>${game.name}</span> <span class="btn-status">Launch ↗</span>`;
+            button.onclick = () => launchFromCDN(button, game.name, game.url);
+            container.appendChild(button);
+        });
+    </script>
+</body>
+</html>
