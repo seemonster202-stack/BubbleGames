@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Math Video Explorer</title>
+  <style>
+    * { box-sizing: border-box; font-family: Arial, sans-serif; }
+    body { display: flex; flex-direction: column; height: 100vh; margin: 0; background: #f4f6f8; }
+    
+    header { background: #1a73e8; color: white; padding: 1rem; display: flex; gap: 10px; align-items: center; }
+    header input { padding: 8px; border-radius: 4px; border: none; font-size: 14px; }
+    #folder-id-input { flex: 2; }
+    #search-input { flex: 1; }
+    header button { padding: 8px 16px; border: none; background: #0d47a1; color: white; border-radius: 4px; cursor: pointer; }
+
+    .main-container { display: flex; flex: 1; overflow: hidden; }
+    
+    /* Left Panel: Navigation & Search */
+    .sidebar { width: 400px; background: white; border-right: 1px solid #ccc; display: flex; flex-direction: column; padding: 1rem; }
+    .breadcrumb { margin-bottom: 10px; font-size: 14px; color: #666; }
+    .file-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+    
+    .item-btn { display: flex; align-items: center; gap: 8px; text-align: left; padding: 10px; border: 1px solid #e0e0e0; background: #fafafa; border-radius: 6px; cursor: pointer; font-size: 14px; transition: 0.2s; }
+    .item-btn:hover { background: #e8f0fe; border-color: #1a73e8; }
+    .item-btn.folder { font-weight: bold; color: #1a73e8; }
+    .item-btn.video { color: #333; }
+
+    /* Right Panel: Player */
+    .player-container { flex: 1; background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+    iframe { width: 100%; height: 100%; border: none; }
+    .placeholder { color: #888; font-size: 18px; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <input type="text" id="folder-id-input" placeholder="Enter Google Drive Folder ID...">
+    <button onclick="loadInitialFolder()">Load Folder</button>
+    <input type="text" id="search-input" placeholder="Search math videos..." oninput="filterItems()">
+  </header>
+
+  <div class="main-container">
+    <!-- Navigation Sidebar -->
+    <div class="sidebar">
+      <div class="breadcrumb" id="breadcrumb">Root</div>
+      <div class="file-list" id="file-list">
+        <!-- Folders and files populated here -->
+      </div>
+    </div>
+
+    <!-- Video Display -->
+    <div class="player-container" id="player-container">
+      <div class="placeholder">Select a math video from the list to play</div>
+    </div>
+  </div>
+
+  <script>
+    const API_KEY = 'YOUR_GOOGLE_API_KEY'; // Replace with your Google API Key
+    let currentFolderId = '';
+    let folderHistory = [];
+    let currentFetchedFiles = [];
+
+    // Load initial root folder entered by user
+    function loadInitialFolder() {
+      const input = document.getElementById('folder-id-input').value.trim();
+      if (!input) return alert('Please enter a valid Folder ID');
+      
+      folderHistory = [{ name: 'Root', id: input }];
+      navigateToFolder(input);
+    }
+
+    // Fetch items inside target folder using Drive API v3
+    async function fetchFolderContents(folderId) {
+      currentFolderId = folderId;
+      // Query parameters: files whose parent is current folder and not in trash
+      const query = encodeURIComponent(`'${folderId}' in parents and trashed = false`);
+      const fields = encodeURIComponent('files(id, name, mimeType)');
+      const url = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=${fields}&key=${API_KEY}`;
+
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.error) {
+          alert('API Error: ' + data.error.message);
+          return [];
+        }
+        
+        currentFetchedFiles = data.files || [];
+        return currentFetchedFiles;
+      } catch (err) {
+        console.error(err);
+        alert('Failed to fetch folder contents');
+        return [];
+      }
+    }
+
+    // Render list items to screen
+    async function navigateToFolder(folderId) {
+      const listContainer = document.getElementById('file-list');
+      listContainer.innerHTML = 'Loading...';
+      
+      updateBreadcrumb();
+      const files = await fetchFolderContents(folderId);
+      renderFileList(files);
+    }
+
+    function renderFileList(files) {
+      const listContainer = document.getElementById('file-list');
+      listContainer.innerHTML = '';
+
+      // Back button if inside subfolders
+      if (folderHistory.length > 1) {
+        const backBtn = document.createElement('button');
+        backBtn.className = 'item-btn';
+        backBtn.innerHTML = '⬅️ <b>Go Back</b>';
+        backBtn.onclick = () => {
+          folderHistory.pop();
+          const previous = folderHistory[folderHistory.length - 1];
+          navigateToFolder(previous.id);
+        };
+        listContainer.appendChild(backBtn);
+      }
+
+      if (files.length === 0) {
+        listContainer.innerHTML += '<p>No items found in this folder.</p>';
+        return;
+      }
+
+      files.forEach(file => {
+        const isFolder = file.mimeType === 'application/vnd.google-apps.folder';
+        const isVideo = file.mimeType.includes('video');
+
+        if (isFolder || isVideo) {
+          const btn = document.createElement('button');
+          btn.className = `item-btn ${isFolder ? 'folder' : 'video'}`;
+          btn.innerHTML = `${isFolder ? '📁' : '🎥'} ${file.name}`;
+
+          btn.onclick = () => {
+            if (isFolder) {
+              folderHistory.push({ name: file.name, id: file.id });
+              navigateToFolder(file.id);
+            } else if (isVideo) {
+              playVideo(file.id);
+            }
+          };
+
+          listContainer.appendChild(btn);
+        }
+      });
+    }
+
+    // Embed Drive Player frame for streamable preview
+    function playVideo(fileId) {
+      const container = document.getElementById('player-container');
+      container.innerHTML = `
+        <iframe 
+          src="https://drive.google.com/file/d/${fileId}/preview" 
+          allow="autoplay">
+        </iframe>`;
+    }
+
+    // Instant local title search filter
+    function filterItems() {
+      const term = document.getElementById('search-input').value.toLowerCase();
+      const filtered = currentFetchedFiles.filter(f => f.name.toLowerCase().includes(term));
+      renderFileList(filtered);
+    }
+
+    // Update navigation track path
+    function updateBreadcrumb() {
+      const breadcrumb = document.getElementById('breadcrumb');
+      breadcrumb.innerText = folderHistory.map(h => h.name).join(' / ');
+    }
+  </script>
+</body>
+</html>

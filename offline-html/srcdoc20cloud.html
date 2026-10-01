@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title></title>
+  
+  <!-- JSZip (Required for ZIP Engine & Firestore Compression) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <style>
+    /* ==========================================
+       THEMING & STYLING
+       ========================================== */
+    :root {
+      --bg-color: #0d0b18;        
+      --panel-bg: #161224;       
+      --card-bg: #1e1832;        
+      --accent-color: #7c3aed;   
+      --accent-hover: #8b5cf6;   
+      --text-primary: #f5f3ff;   
+      --text-secondary: #9ca3af; 
+      --border-color: #27203d;   
+      --sidebar-width: 250px;
+      --topbar-height: 52px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg-color); color: var(--text-primary); height: 100vh; display: flex; overflow: hidden; }
+
+    /* SIDEBAR */
+    #sidebar { width: var(--sidebar-width); background-color: var(--panel-bg); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 10; }
+    .sidebar-header { padding: 1.25rem 1rem 0.75rem 1rem; background: linear-gradient(180deg, rgba(124, 58, 237, 0.15) 0%, rgba(0, 0, 0, 0) 100%); }
+    .sidebar-header h2 { font-size: 1.15rem; font-weight: 700; color: var(--text-primary); letter-spacing: 0.5px; }
+    .search-container { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border-color); }
+    .search-input { width: 100%; background-color: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.45rem 0.75rem; border-radius: 6px; font-size: 0.85rem; outline: none; transition: border-color 0.2s ease; }
+    .search-input:focus { border-color: var(--accent-hover); }
+    .search-input::placeholder { color: var(--text-secondary); }
+    .game-list { flex: 1; overflow-y: auto; padding: 0.75rem 0.5rem; list-style: none; }
+    .game-item { padding: 0.75rem 1rem; margin-bottom: 0.4rem; border-radius: 8px; cursor: pointer; color: var(--text-secondary); font-weight: 500; font-size: 0.9rem; transition: all 0.2s ease; border: 1px solid transparent; }
+    .game-item:hover { background-color: var(--card-bg); color: var(--text-primary); border-color: var(--border-color); }
+    .game-item.active { background-color: var(--accent-color); color: #ffffff; font-weight: 600; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35); border-color: var(--accent-hover); }
+
+    /* PLAYER & CONTROLS */
+    #main-content { flex: 1; display: flex; flex-direction: column; }
+    .top-bar { height: var(--topbar-height); background-color: var(--panel-bg); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 1.25rem; }
+    .game-title { font-weight: 600; font-size: 0.95rem; color: var(--text-primary); }
+    .controls { display: flex; gap: 0.5rem; align-items: center; }
+    #cloudSyncIndicator { font-size: 0.75rem; color: #4ade80; opacity: 0; transition: opacity 0.3s ease; margin-right: 10px; }
+    .btn { background-color: var(--card-bg); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.45rem 0.85rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 500; transition: all 0.2s ease; }
+    .btn:hover { background-color: var(--accent-color); border-color: var(--accent-hover); box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3); }
+    .btn-highlight { background: linear-gradient(135deg, rgba(124, 58, 237, 0.9), rgba(139, 92, 246, 0.9)); border: none; font-weight: 600; }
+    .btn-highlight:hover { background: linear-gradient(135deg, rgba(139, 92, 246, 1), rgba(124, 58, 237, 1)); }
+
+    .iframe-container { flex: 1; position: relative; background-color: #000000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    iframe { border: none; display: block; transition: all 0.2s ease; width: 100%; height: 100%; z-index: 1; }
+    .placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 0.95rem; background-color: var(--bg-color); z-index: 5; }
+
+    /* Engine Loader UI */
+    #loaderUI { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; background: rgba(13, 11, 24, 0.9); color: #fff; font-size: 14px; z-index: 10; }
+    .spinner { width: 42px; height: 42px; border-radius: 50%; border: 4px solid var(--border-color); border-top-color: var(--accent-color); border-right-color: var(--accent-hover); animation: spin 0.8s linear infinite; margin-bottom: 16px; }
+    #zipProgressContainer { width: 40%; max-width: 300px; background: var(--card-bg); border-radius: 999px; overflow: hidden; border: 1px solid var(--border-color); margin-bottom: 10px; }
+    #zipProgressBar { height: 10px; width: 0%; background: linear-gradient(90deg, var(--accent-color), var(--accent-hover)); transition: width 0.15s ease-out; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    /* ASPECT RATIO MODES */
+    .ratio-4-3 { max-width: calc((100vh - var(--topbar-height)) * (4 / 3)); max-height: calc((100vw - var(--sidebar-width)) * (3 / 4)); aspect-ratio: 4/3; }
+    .ratio-16-9 { max-width: calc((100vh - var(--topbar-height)) * (16 / 9)); max-height: calc((100vw - var(--sidebar-width)) * (9 / 16)); aspect-ratio: 16/9; }
+    .ratio-freeform { width: 100%; height: 100%; }
+
+    /* CLOUD SAVE MODAL */
+    .modal-overlay { position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.85); backdrop-filter: blur(6px); display: none; align-items: center; justify-content: center; z-index: 1000; }
+    .modal-box { background-color: var(--panel-bg); border: 1px solid var(--border-color); padding: 2rem; border-radius: 12px; max-width: 420px; width: 90%; text-align: center; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); }
+    .modal-box h2 { margin-bottom: 0.5rem; font-size: 1.25rem; }
+    .modal-box p { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.75rem; }
+    .warning-text { color: #f59e0b; font-size: 0.78rem; font-weight: 500; margin-bottom: 1.25rem; }
+    .input-group { display: flex; gap: 0.5rem; }
+    .input-group input { flex: 1; background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.5rem; border-radius: 6px; outline: none; }
+    .input-group input:focus { border-color: var(--accent-hover); }
+    .btn-primary { background: var(--accent-color); color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary { width: 100%; background: var(--card-bg); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.6rem; border-radius: 6px; cursor: pointer; font-weight: 500; }
+    .btn-secondary:hover { border-color: var(--accent-hover); }
+    .divider { margin: 1.25rem 0; border-bottom: 1px solid var(--border-color); line-height: 0.1em; }
+    .divider span { background: var(--panel-bg); padding: 0 10px; color: var(--text-secondary); font-size: 0.75rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Hidden Inputs for GLP Engine -->
+  <input type="file" id="fileInput" accept=".html" style="display:none">
+  <input type="file" id="zipInput" accept=".zip" style="display:none">
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <h2>Web Games 2.0</h2>
+    </div>
+    <div class="search-container">
+      <input type="text" id="searchInput" class="search-input" placeholder="🔍 Search library..." oninput="filterGames()">
+    </div>
+    <ul class="game-list" id="gameList"></ul>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main id="main-content">
+    <div class="top-bar">
+      <span class="game-title" id="activeTitle">Select or Load a Game</span>
+      <div class="controls">
+        <span id="cloudSyncIndicator">☁️ Saved</span>
+        <button class="btn btn-highlight" onclick="document.getElementById('fileInput').click()">Load HTML</button>
+        <button class="btn btn-highlight" onclick="document.getElementById('zipInput').click()">Load ZIP</button>
+        <button class="btn" onclick="openModal()">☁️ Cloud</button>
+        <button class="btn" onclick="reloadGame()">Reload</button>
+        <button class="btn" onclick="toggleFullscreen()">Fullscreen</button>
+      </div>
+    </div>
+
+    <!-- PLAYER -->
+    <div class="iframe-container" id="playerContainer">
+      <div class="placeholder" id="placeholder">Select a game from the sidebar or upload files.</div>
+      
+      <div id="loaderUI">
+        <div class="spinner"></div>
+        <div id="zipProgressContainer" style="display: none;">
+            <div id="zipProgressBar"></div>
+        </div>
+        <div id="loaderText">Loading Engine…</div>
+      </div>
+
+      <iframe id="gameFrame" allow="fullscreen; autoplay; keyboard-trap" allowfullscreen="true" sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-forms allow-downloads allow-popups"></iframe>
+    </div>
+  </main>
+
+  <!-- CLOUD SAVE MODAL -->
+  <div id="cloudModal" class="modal-overlay">
+    <div class="modal-box">
+      <h2>☁️ Firebase Cloud Profile</h2>
+      <p>Enter your Cloud Save Key to sync progress across devices.</p>
+      <p class="warning-text">⚠️ Saving 3D/Engine games (IndexedDB) may take a few seconds.</p>
+      
+      <div class="input-group">
+        <input type="text" id="cloudKeyInput" placeholder="Paste Cloud Save Key here...">
+        <button class="btn-primary" onclick="useExistingKey()">Load</button>
+      </div>
+      <div id="modalStatusMsg" style="margin-top: 10px; font-size: 0.85rem; font-weight: 500;"></div>
+      <div class="divider"><span>OR</span></div>
+      <button class="btn-secondary" onclick="createNewKey()">✨ Create New Cloud Save Key</button>
+
+      <div id="keyDisplayArea" style="display: none; margin-top: 15px;">
+        <p style="color: #4ade80; font-size: 0.85rem; margin-bottom: 5px;">New Key Created! Save this key:</p>
+        <input type="text" id="newGeneratedKey" readonly style="width: 100%; padding: 6px; text-align: center; margin-bottom: 10px; background: var(--card-bg); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px;">
+        <button class="btn-primary" style="width: 100%;" onclick="closeModal()">Continue</button>
+      </div>
+
+      <p style="margin-top: 15px; margin-bottom: 0;">
+        <a href="#" onclick="event.preventDefault(); closeModal();" style="color: var(--text-secondary); font-size: 0.75rem; text-decoration: underline;">Skip for now</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- FIREBASE IMPORTS -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDMMKjfnB1IXjO-PIa6BTIboAJwoYp9vY4",
+      authDomain: "bubblecloud-38185.firebaseapp.com",
+      projectId: "bubblecloud-38185",
+      storageBucket: "bubblecloud-38185.firebasestorage.app",
+      messagingSenderId: "543089433151",
+      appId: "1:543089433151:web:c200a172c3fe8db286368a",
+      measurementId: "G-G2JHE6VJTL"
+    };
+
+    try {
+      const app = initializeApp(firebaseConfig);
+      window.db = getFirestore(app);
+      window.doc = doc;
+      window.setDoc = setDoc;
+      window.getDoc = getDoc;
+    } catch(err) {
+      console.error("Firebase Initialization Error:", err);
+    }
+  </script>
+
+  <script>
+    /* =========================================================================
+       DOM ELEMENTS & GLOBAL STATE
+       ========================================================================= */
+    const fileInput = document.getElementById("fileInput");
+    const zipInput = document.getElementById("zipInput");
+    const gameFrame = document.getElementById("gameFrame");
+    const placeholder = document.getElementById("placeholder");
+    const loaderUI = document.getElementById("loaderUI");
+    const loaderText = document.getElementById("loaderText");
+    const zipProgressContainer = document.getElementById("zipProgressContainer");
+    const zipProgressBar = document.getElementById("zipProgressBar");
+    
+    let zipVirtualFS = {};
+    let loadTimeout = null;
+    let activeGameObj = null;
+    let activeUserKey = localStorage.getItem('activeCloudKey') || null;
+
+    /* =========================================================================
+       INDEXED-DB MANAGER (BINARY SERIALIZATION & COMPRESSION)
+       ========================================================================= */
+    function arrayBufferToBase64(buffer) {
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+        return window.btoa(binary);
+    }
+
+    function base64ToUint8Array(base64) {
+        const binary_string = window.atob(base64);
+        const len = binary_string.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) bytes[i] = binary_string.charCodeAt(i);
+        return bytes;
+    }
+
+    function serializeIDBValue(val) {
+        if (val instanceof Uint8Array) return { _t: 'U8', d: arrayBufferToBase64(val) };
+        if (val instanceof ArrayBuffer) return { _t: 'AB', d: arrayBufferToBase64(val) };
+        if (Array.isArray(val)) return val.map(serializeIDBValue);
+        if (val !== null && typeof val === 'object') {
+            const out = {};
+            for (let k in val) out[k] = serializeIDBValue(val[k]);
+            return out;
+        }
+        return val;
+    }
+
+    function deserializeIDBValue(val) {
+        if (val && typeof val === 'object') {
+            if (val._t === 'U8') return base64ToUint8Array(val.d);
+            if (val._t === 'AB') return base64ToUint8Array(val.d).buffer;
+            if (Array.isArray(val)) return val.map(deserializeIDBValue);
+            const out = {};
+            for (let k in val) out[k] = deserializeIDBValue(val[k]);
+            return out;
+        }
+        return val;
+    }
+
+    const IDB_Manager = {
+        async getDbNames() {
+            let names = [];
+            if (indexedDB.databases) {
+                try {
+                    const dbs = await indexedDB.databases();
+                    names = dbs.map(db => db.name);
+                } catch(e){}
+            }
+            if (names.length === 0) names = ['/idbfs', 'UnityCache']; 
+            
+            return names.filter(name => 
+                !name.includes('UnityCache') && 
+                !name.includes('workbox') && 
+                !name.includes('sw-precache')
+            );
+        },
+        async exportAll() {
+            const names = await this.getDbNames();
+            let allData = {};
+            for (let dbName of names) {
+                try {
+                    allData[dbName] = await this.exportDB(dbName);
+                } catch (e) { console.warn(`Skipped exporting DB: ${dbName}`, e); }
+            }
+            return allData;
+        },
+        async exportDB(dbName) {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(dbName);
+                req.onsuccess = (e) => {
+                    const db = e.target.result;
+                    const data = { version: db.version, stores: {} };
+                    const storeNames = Array.from(db.objectStoreNames);
+                    if (storeNames.length === 0) { db.close(); resolve(data); return; }
+
+                    const tx = db.transaction(storeNames, 'readonly');
+                    let completed = 0;
+
+                    storeNames.forEach(storeName => {
+                        const store = tx.objectStore(storeName);
+                        data.stores[storeName] = { keyPath: store.keyPath, autoIncrement: store.autoIncrement, records: [] };
+                        const cursorReq = store.openCursor();
+                        cursorReq.onsuccess = (ce) => {
+                            const cursor = ce.target.result;
+                            if (cursor) {
+                                data.stores[storeName].records.push({ key: cursor.key, value: serializeIDBValue(cursor.value) });
+                                cursor.continue();
+                            } else {
+                                completed++;
+                                if (completed === storeNames.length) { db.close(); resolve(data); }
+                            }
+                        };
+                    });
+                };
+                req.onerror = () => reject(req.error);
+            });
+        },
+        async importDB(dbName, data) {
+            return new Promise((resolve, reject) => {
+                if (!data || !data.stores) return resolve();
+                const req = indexedDB.open(dbName, data.version);
+                req.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    for (let storeName in data.stores) {
+                        if (!db.objectStoreNames.contains(storeName)) {
+                            const storeInfo = data.stores[storeName];
+                            db.createObjectStore(storeName, { keyPath: storeInfo.keyPath, autoIncrement: storeInfo.autoIncrement });
+                        }
+                    }
+                };
+                req.onsuccess = async (e) => {
+                    const db = e.target.result;
+                    const storeNames = Object.keys(data.stores);
+                    if (storeNames.length === 0) { db.close(); resolve(); return; }
+
+                    const tx = db.transaction(storeNames, 'readwrite');
+                    for (let storeName of storeNames) {
+                        const store = tx.objectStore(storeName);
+                        const records = data.stores[storeName].records;
+                        await new Promise(r => { const clr = store.clear(); clr.onsuccess = r; });
+                        for (let record of records) {
+                            store.put(deserializeIDBValue(record.value), store.keyPath ? undefined : record.key);
+                        }
+                    }
+                    tx.oncomplete = () => { db.close(); resolve(); };
+                };
+                req.onerror = () => reject(req.error);
+            });
+        }
+    };
+
+    /* =========================================================================
+       CLOUD SYNC API (Parent -> Iframe Bridge with Auto-Chunking for >1MB)
+       ========================================================================= */
+    window.cloudSavePendingData = {};
+    window.cloudSaveTimeout = null;
+    window.cloudIdbTimeout = null;
+
+    function setIndicatorStatus(text, color, reset = true) {
+        const ind = document.getElementById('cloudSyncIndicator');
+        ind.textContent = text;
+        ind.style.color = color;
+        ind.style.opacity = "1";
+        if (reset) setTimeout(() => { ind.style.opacity = "0"; }, 2500);
+    }
+
+    window.CloudAPI = {
+      syncLocalStorage: (safeGameId, key, value) => {
+        if (!activeUserKey || !window.db) return;
+        setIndicatorStatus("☁️ Saving...", "#f59e0b", false);
+        if (!window.cloudSavePendingData[safeGameId]) window.cloudSavePendingData[safeGameId] = {};
+        window.cloudSavePendingData[safeGameId][key] = value;
+
+        if (window.cloudSaveTimeout) clearTimeout(window.cloudSaveTimeout);
+        window.cloudSaveTimeout = setTimeout(async () => {
+          const payload = {};
+          for (const gId in window.cloudSavePendingData) payload[`ls_${gId}`] = window.cloudSavePendingData[gId];
+          window.cloudSavePendingData = {};
+          
+          try {
+              await window.setDoc(window.doc(window.db, "user_saves", activeUserKey), payload, { merge: true });
+              setIndicatorStatus("☁️ Saved", "#4ade80");
+          } catch (e) { setIndicatorStatus("⚠️ Sync Failed", "#ef4444"); }
+        }, 3000); 
+      },
+      
+      syncIndexedDB: (safeGameId) => {
+          if (!activeUserKey || !window.db) return;
+          setIndicatorStatus("☁️ Indexing...", "#f59e0b", false);
+
+          if (window.cloudIdbTimeout) clearTimeout(window.cloudIdbTimeout);
+          window.cloudIdbTimeout = setTimeout(async () => {
+              try {
+                  const dbData = await IDB_Manager.exportAll();
+                  
+                  const zip = new JSZip();
+                  zip.file("idb.json", JSON.stringify(dbData));
+                  const compressedB64 = await zip.generateAsync({ type: "base64", compression: "DEFLATE" });
+                  
+                  // Firestore 1MB safety chunking (split into ~800KB chunks)
+                  const CHUNK_SIZE = 800000; 
+                  const totalChunks = Math.ceil(compressedB64.length / CHUNK_SIZE);
+                  const payload = { [`idb_${safeGameId}_count`]: totalChunks };
+                  
+                  // Clear out old chunks first or store them cleanly
+                  for (let i = 0; i < totalChunks; i++) {
+                      payload[`idb_${safeGameId}_p${i}`] = compressedB64.substr(i * CHUNK_SIZE, CHUNK_SIZE);
+                  }
+                  
+                  await window.setDoc(window.doc(window.db, "user_saves", activeUserKey), payload, { merge: true });
+                  setIndicatorStatus("☁️ Saved 3D", "#4ade80");
+              } catch (e) { 
+                  console.error("IDB Sync Error:", e);
+                  setIndicatorStatus("⚠️ 3D Sync Failed", "#ef4444"); 
+              }
+          }, 6000); 
+      }
+    };
+
+    /* =========================================================================
+       GAMELOADER PRO ENGINE LOGIC
+       ========================================================================= */
+    function showLoader(message, isZip = false) {
+      loaderText.textContent = message || "Loading…";
+      loaderUI.style.display = "flex";
+      placeholder.style.display = "none";
+      if (isZip) { zipProgressContainer.style.display = "block"; zipProgressBar.style.width = "0%"; } 
+      else { zipProgressContainer.style.display = "none"; }
+    }
+
+    function hideLoader() { loaderUI.style.display = "none"; }
+
+    async function loadHtmlToEngine(htmlText, gameTitle = "Local Game") {
+      document.getElementById('activeTitle').textContent = gameTitle;
+      showLoader("Connecting to Cloud Server…");
+      const safeGameId = gameTitle.replace(/[^a-zA-Z0-9_]/g, '_');
+      
+      let injectedScript = "";
+      
+      if (activeUserKey && window.db) {
+          try {
+              const docSnap = await window.getDoc(window.doc(window.db, "user_saves", activeUserKey));
+              if (docSnap.exists()) {
+                  const data = docSnap.data();
+                  const cloudStorageData = data[`ls_${safeGameId}`] || {};
+                  
+                  // Reconstruct multi-chunked IndexedDB payload if it exists
+                  let compressedIdbData = "";
+                  const chunkCount = data[`idb_${safeGameId}_count`] || 0;
+                  if (chunkCount > 0) {
+                      for (let i = 0; i < chunkCount; i++) {
+                          compressedIdbData += (data[`idb_${safeGameId}_p${i}`] || "");
+                      }
+                  } else {
+                      compressedIdbData = data[`idb_${safeGameId}`] || "";
+                  }
+
+                  if (compressedIdbData) {
+                      showLoader("Restoring 3D Cloud Data…");
+                      const zip = new JSZip();
+                      await zip.loadAsync(compressedIdbData, { base64: true });
+                      const idbJsonStr = await zip.file("idb.json").async("string");
+                      const idbData = JSON.parse(idbJsonStr);
+                      
+                      // FIX APPLIED HERE: Strictly await every database import transaction to finish
+                      for (const dbName in idbData) {
+                          await IDB_Manager.importDB(dbName, idbData[dbName]);
+                      }
+                  }
+                  
+                  injectedScript = `
+                  <script>
+                      const cloudData = ${JSON.stringify(cloudStorageData)};
+                      for (const k in cloudData) localStorage.setItem(k, cloudData[k]);
+                      
+                      const originalSetItem = localStorage.setItem;
+                      localStorage.setItem = function(key, value) {
+                          originalSetItem.apply(this, arguments);
+                          if (window.parent && window.parent.CloudAPI) window.parent.CloudAPI.syncLocalStorage("${safeGameId}", key, value);
+                      };
+
+                      const origPut = IDBObjectStore.prototype.put;
+                      const origAdd = IDBObjectStore.prototype.add;
+                      const origDelete = IDBObjectStore.prototype.delete;
+                      const origClear = IDBObjectStore.prototype.clear;
+
+                      function flagIdbDirty() {
+                          if (window.parent && window.parent.CloudAPI) window.parent.CloudAPI.syncIndexedDB("${safeGameId}");
+                      }
+
+                      IDBObjectStore.prototype.put = function() { flagIdbDirty(); return origPut.apply(this, arguments); };
+                      IDBObjectStore.prototype.add = function() { flagIdbDirty(); return origAdd.apply(this, arguments); };
+                      IDBObjectStore.prototype.delete = function() { flagIdbDirty(); return origDelete.apply(this, arguments); };
+                      IDBObjectStore.prototype.clear = function() { flagIdbDirty(); return origClear.apply(this, arguments); };
+                  <\/script>\n`;
+              }
+          } catch(e) { console.error("Cloud fetch failed, game will load locally", e); }
+      }
+
+      showLoader("Spinning up engine…");
+
+      if (/<head[^>]*>/i.test(htmlText)) htmlText = htmlText.replace(/(<head[^>]*>)/i, `$1\n${injectedScript}`);
+      else if (/<html[^>]*>/i.test(htmlText)) htmlText = htmlText.replace(/(<html[^>]*>)/i, `$1\n<head>\n${injectedScript}\n</head>\n`);
+      else htmlText = injectedScript + htmlText;
+
+      gameFrame.removeAttribute('src');
+      gameFrame.srcdoc = htmlText;
+      
+      if (loadTimeout) clearTimeout(loadTimeout);
+      loadTimeout = setTimeout(() => {
+          if(loaderUI.style.display !== "none") {
+            hideLoader();
+            placeholder.style.display = "flex";
+            placeholder.textContent = "Engine Load Timeout. Check game code.";
+          }
+      }, 5000);
+    }
+
+    gameFrame.addEventListener("load", () => {
+      if (loadTimeout) clearTimeout(loadTimeout);
+      hideLoader();
+    });
+
+    fileInput.addEventListener("change", e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => loadHtmlToEngine(ev.target.result, file.name);
+      reader.readAsText(file);
+    });
+
+    zipInput.addEventListener("change", async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        document.getElementById('activeTitle').textContent = file.name;
+        showLoader("Extracting ZIP assets…", true);
+        try {
+            const finalHtml = await loadZipGameFromFile(file);
+            await loadHtmlToEngine(finalHtml, file.name);
+        } catch (err) {
+            console.error(err);
+            hideLoader();
+            placeholder.style.display = "flex"; placeholder.textContent = "Failed to load ZIP file.";
+        }
+    });
+
+    function normalizeZipPath(path) { return path.replace(/\\/g, "/").replace(/^\.\/+/, ""); }
+    function resolveRelativePath(basePath, relativePath) {
+        basePath = normalizeZipPath(basePath); relativePath = normalizeZipPath(relativePath);
+        const lastSlash = basePath.lastIndexOf("/");
+        let baseDir = lastSlash === -1 ? "" : basePath.slice(0, lastSlash + 1);
+        if (relativePath.startsWith("/")) return relativePath.slice(1);
+        const stack = baseDir.split("/").filter(Boolean);
+        const parts = relativePath.split("/");
+        for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+            if (!part || part === ".") continue;
+            if (part === "..") stack.pop(); else stack.push(part);
+        }
+        return stack.join("/");
+    }
+    function isDataOrHttpUrl(u) { return /^(data:|https?:|blob:)/i.test(u); }
+
+    function rewriteHtmlAssetPaths(htmlText, htmlPath) {
+        htmlText = htmlText.replace(/(src|href)\s*=\s*("([^"]+)"|'([^']+)'|([^>\s"']+))/gi, function(match, attr, full, dq, sq, bare) {
+                const trimmed = (dq || sq || bare || "").trim();
+                if (!trimmed || isDataOrHttpUrl(trimmed) || trimmed.startsWith("#")) return match;
+                const blobUrl = zipVirtualFS[resolveRelativePath(htmlPath, trimmed)];
+                return blobUrl ? `${attr}="${blobUrl}"` : match;
+            });
+        htmlText = htmlText.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, function(match, quote, urlPath) {
+                const trimmed = urlPath.trim();
+                if (!trimmed || isDataOrHttpUrl(trimmed) || trimmed.startsWith("#")) return match;
+                const blobUrl = zipVirtualFS[resolveRelativePath(htmlPath, trimmed)];
+                return blobUrl ? `url("${blobUrl}")` : match;
+            });
+        return htmlText;
+    }
+
+    async function loadZipGameFromFile(file) {
+        const arrayBuffer = await file.arrayBuffer();
+        const zip = await JSZip.loadAsync(arrayBuffer);
+        const fileEntries = [];
+        zip.forEach((path, entry) => { if (!entry.dir) fileEntries.push({ path, entry }); });
+
+        const htmlFiles = [];
+        for (const f of fileEntries) {
+            if (f.path.toLowerCase().endsWith(".html")) {
+                const content = await f.entry.async("string");
+                htmlFiles.push({ path: f.path, content, size: content.length });
+            }
+        }
+        if (htmlFiles.length === 0) throw new Error("No HTML files found in ZIP.");
+        htmlFiles.sort((a, b) => b.size - a.size);
+        const mainHtml = htmlFiles[0];
+
+        zipVirtualFS = {};
+        for (const f of fileEntries) {
+            if (f.path.toLowerCase().endsWith(".html")) continue;
+            const blob = await f.entry.async("blob", { onProgress: meta => { zipProgressBar.style.width = Math.floor(meta.percent || 0) + "%"; } });
+            zipVirtualFS[normalizeZipPath(f.path)] = URL.createObjectURL(blob);
+        }
+        return rewriteHtmlAssetPaths(mainHtml.content, mainHtml.path);
+    }
+
+    /* =========================================================================
+       SIDEBAR & JSDELIVR FETCHING LOGIC
+       ========================================================================= */
+    const GAMES_CONFIG = [
+      { title: "Block Blast", url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/block-blast/index.html", aspectRatio: 3 },
+      { title: "Drive Mad", url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/drive-mad/index.html", aspectRatio: 3 },
+      { title: "Google Baseball", url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/googlebaseball/index.html", aspectRatio: 2 },
+      { title: "Level Devil", url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/level-devil/index.html", aspectRatio: 2 },
+      { title: "Pokémon Johto Legends", url: "https://raw.githubusercontent.com/seemonster202-stack/BubbleGames/refs/heads/main/PJL/PJL%200.2.2%20(Dev%20Build%205).html", aspectRatio: 1 },  
+      { title: "Poor Bunny", url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/poor-bunny/index.html", aspectRatio: 3 },
+      { title: "Slime Rancher", url: "https://cdn.jsdelivr.net/gh/web-ports/slime-ranchers@refs/heads/main/index.html", aspectRatio: 3 },
+      { title: "Slope", url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/slope/index.html", aspectRatio: 3 },
+      { title: "Slow Roads", url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/slow-roads/index.html", aspectRatio: 3 },
+      { title: "Snow Rider 3D", url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/snow-rider-3d/index.html", aspectRatio: 3 },
+      { title: "Soccer Random", url: "https://cdn.jsdelivr.net/gh/seemonster202-stack/BubbleGames@refs/heads/main/soccer-random.html", aspectRatio: 2 },
+      { title: "Super Liquid Soccer", url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/super-liquid-soccer/index.html", aspectRatio: 2 }, 
+      { title: "Vex 3", url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/vex-3/index.html", aspectRatio: 2 },
+      { title: "Vex 4", url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/vex-4/index.html", aspectRatio: 2 },
+      { title: "Vex 5", url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/vex-5/index.html", aspectRatio: 2 },
+      { title: "Vex 6", url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/vex-6/index.html", aspectRatio: 2 },
+      { title: "Vex 7", url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/vex-7/index.html", aspectRatio: 2 },
+      { title: "Vex 8", url: "https://cdn.jsdelivr.net/gh/Gr4ys0n/Gr4ys0n.github.io@main/public/assets/games/vex-8/index.html", aspectRatio: 2 },
+      { title: "Volley Random", url: "https://cdn.jsdelivr.net/gh/seemonster202-stack/BubbleGames@refs/heads/main/volley-random.html", aspectRatio: 2 }
+    ];
+
+    function renderList(gamesToRender) {
+      const listContainer = document.getElementById('gameList');
+      listContainer.innerHTML = '';
+      if (gamesToRender.length === 0) { listContainer.innerHTML = '<li class="no-results" style="padding:1rem;color:var(--text-secondary);text-align:center;">No games match your search.</li>'; return; }
+      gamesToRender.forEach((game) => {
+        const li = document.createElement('li');
+        li.className = 'game-item';
+        if (activeGameObj && activeGameObj.title === game.title) li.classList.add('active');
+        li.textContent = game.title;
+        li.onclick = () => loadSidebarGame(game, li);
+        listContainer.appendChild(li);
+      });
+    }
+
+    function filterGames() {
+      const query = document.getElementById('searchInput').value.toLowerCase().trim();
+      renderList(GAMES_CONFIG.filter(game => game.title.toLowerCase().includes(query)));
+    }
+
+    async function loadSidebarGame(game, element) {
+      if (element) {
+        document.querySelectorAll('.game-item').forEach(el => el.classList.remove('active'));
+        element.classList.add('active');
+      }
+      activeGameObj = game;
+      
+      gameFrame.className = '';
+      if (game.aspectRatio === 1) gameFrame.classList.add('ratio-4-3');
+      else if (game.aspectRatio === 2) gameFrame.classList.add('ratio-16-9');
+      else gameFrame.classList.add('ratio-freeform');
+
+      showLoader("Fetching raw file from JSdelivr…");
+
+      try {
+        const response = await fetch(game.url);
+        if (!response.ok) throw new Error("Network response was not ok");
+        let htmlText = await response.text();
+
+        const baseUrl = game.url.substring(0, game.url.lastIndexOf('/') + 1);
+        const baseTag = `<base href="${baseUrl}">`;
+        
+        if (/<head[^>]*>/i.test(htmlText)) htmlText = htmlText.replace(/(<head[^>]*>)/i, `$1\n${baseTag}\n`);
+        else if (/<html[^>]*>/i.test(htmlText)) htmlText = htmlText.replace(/(<html[^>]*>)/i, `$1\n<head>\n${baseTag}\n</head>\n`);
+        else htmlText = `${baseTag}\n` + htmlText;
+
+        await loadHtmlToEngine(htmlText, game.title);
+      } catch (err) {
+        console.error("Engine fetch failed, falling back to direct URL assignment:", err);
+        gameFrame.removeAttribute('srcdoc');
+        gameFrame.src = game.url;
+        document.getElementById('activeTitle').textContent = game.title;
+        hideLoader();
+      }
+    }
+
+    renderList(GAMES_CONFIG);
+
+    /* =========================================================================
+       UTILITIES & CLOUD
+       ========================================================================= */
+    function toggleFullscreen() {
+      const container = document.getElementById("playerContainer");
+      if (container.requestFullscreen) container.requestFullscreen();
+    }
+
+    function reloadGame() {
+        if (gameFrame.srcdoc) {
+            const currentDoc = gameFrame.srcdoc;
+            gameFrame.srcdoc = ''; 
+            setTimeout(() => { gameFrame.srcdoc = currentDoc; }, 10);
+        } else if (gameFrame.src && !gameFrame.src.includes("about:blank")) {
+            gameFrame.src = gameFrame.src;
+        }
+    }
+
+    function openModal() {
+      document.getElementById('modalStatusMsg').textContent = '';
+      if (activeUserKey) document.getElementById('cloudKeyInput').value = activeUserKey;
+      document.getElementById('cloudModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('modalStatusMsg').textContent = '';
+      document.getElementById('cloudModal').style.display = 'none';
+      if (activeGameObj || document.getElementById('activeTitle').textContent !== "Select or Load a Game") reloadGame();
+    }
+
+    async function useExistingKey() {
+      const statusMsg = document.getElementById('modalStatusMsg');
+      const inputKey = document.getElementById('cloudKeyInput').value.trim();
+      
+      if (!inputKey) { statusMsg.style.color = '#ef4444'; statusMsg.textContent = "Invalid code"; return; }
+      if (!window.db) { statusMsg.style.color = '#ef4444'; statusMsg.textContent = "Firebase connecting. Wait a moment."; return; }
+      try {
+        const docSnap = await window.getDoc(window.doc(window.db, "user_saves", inputKey));
+        if (!docSnap.exists()) { statusMsg.style.color = '#ef4444'; statusMsg.textContent = "Save key not found in cloud"; return; }
+        activeUserKey = inputKey;
+        localStorage.setItem('activeCloudKey', activeUserKey);
+        statusMsg.style.color = '#4ade80';
+        statusMsg.textContent = "Cloud save key verified!";
+        setTimeout(() => closeModal(), 1200);
+      } catch (err) { console.error("Firebase Key Check Error:", err); }
+    }
+
+    async function createNewKey() {
+      const statusMsg = document.getElementById('modalStatusMsg');
+      if (!window.db) { statusMsg.style.color = '#ef4444'; statusMsg.textContent = "Firebase connecting. Wait a moment."; return; }
+      try {
+        activeUserKey = 'user_' + Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 6);
+        await window.setDoc(window.doc(window.db, "user_saves", activeUserKey), { _created: new Date().toISOString() }, { merge: true });
+        localStorage.setItem('activeCloudKey', activeUserKey);
+        document.getElementById('newGeneratedKey').value = activeUserKey;
+        document.getElementById('keyDisplayArea').style.display = 'block';
+      } catch (err) { console.error("Firebase Key Creation Error:", err); }
+    }
+  </script>
+</body>
+</html>
