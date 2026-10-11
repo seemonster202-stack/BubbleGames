@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report a Problem</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; background: #f9f9f9; color: #333; }
+        .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h2 { margin-top: 0; color: #222; }
+        label { display: block; margin-top: 15px; font-weight: 600; margin-bottom: 5px; }
+        input, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px; }
+        button { background: #0066cc; color: white; border: none; padding: 12px 20px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; width: 100%; margin-top: 20px; }
+        button:hover { background: #0052a3; }
+        button.secondary { background: #555; margin-top: 10px; }
+        button.secondary:hover { background: #333; }
+        .msg { margin-top: 15px; padding: 10px; border-radius: 4px; display: none; font-weight: 500; }
+        .success { background: #e6f4ea; color: #137333; display: block; }
+        .error { background: #fce8e6; color: #c5221f; display: block; }
+        .hidden { display: none !important; }
+        .report-item { border-bottom: 1px solid #eee; padding: 15px 0; }
+        .report-item:last-child { border-bottom: none; }
+        .meta { font-size: 12px; color: #666; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+    <!-- SECTION 1: REPORT FORM -->
+    <div id="reportSection" class="card">
+        <h2>Report a Problem</h2>
+        <form id="reportForm">
+            <label for="email">Your Email</label>
+            <input type="email" id="email" required placeholder="alex@example.com">
+
+            <label for="message">Problem Description</label>
+            <textarea id="message" rows="5" required placeholder="Describe what went wrong..."></textarea>
+
+            <button type="submit">Submit Report</button>
+        </form>
+        <div id="formMsg" class="msg"></div>
+        <button class="secondary" onclick="showDevLogin()">Dev Dashboard</button>
+    </div>
+
+    <!-- SECTION 2: DEV LOGIN -->
+    <div id="loginSection" class="card hidden">
+        <h2>Developer Sign In</h2>
+        <label for="devPassword">Enter Dev Password</label>
+        <input type="password" id="devPassword">
+        <button onclick="verifyDevPassword()">View Reports</button>
+        <button class="secondary" onclick="showReportForm()">Back to Report</button>
+        <div id="loginMsg" class="msg"></div>
+    </div>
+
+    <!-- SECTION 3: DEV DASHBOARD -->
+    <div id="dashboardSection" class="card hidden">
+        <h2>Reported Problems</h2>
+        <div id="reportsList">Loading reports...</div>
+        <button class="secondary" onclick="showReportForm()">Log Out / Back</button>
+    </div>
+
+    <!-- FIREBASE SDKS -->
+    <script type="module">
+        import { initializeApp } from "https://gstatic.com";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://gstatic.com";
+
+           <!-- FIREBASE SDKS -->
+    <script type="module">
+        import { initializeApp } from "https://gstatic.com";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://gstatic.com";
+
+        // ⚠️ REPLACE THIS WITH YOUR FIREBASE CONFIGURATION
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // ⚠️ SET YOUR CHOSEN DEVELOPER PASSWORD HERE
+        const DEV_PASSWORD = "SuperSecretPassword123"; 
+
+        // --- NAVIGATION & BUTTON EVENT LISTENERS ---
+
+        // 1. "Dev Dashboard" button clicked (Go to Login screen)
+        document.querySelector("#reportSection button.secondary").addEventListener("click", () => {
+            document.getElementById('reportSection').classList.add('hidden');
+            document.getElementById('loginSection').classList.remove('hidden');
+            document.getElementById('loginMsg').className = "msg";
+            document.getElementById('devPassword').value = "";
+        });
+
+        // 2. "View Reports" button clicked (Process Login)
+        document.querySelector("#loginSection button:not(.secondary)").addEventListener("click", () => {
+            const inputPw = document.getElementById('devPassword').value;
+            const loginMsg = document.getElementById('loginMsg');
+            
+            if (inputPw === DEV_PASSWORD) {
+                document.getElementById('loginSection').classList.add('hidden');
+                document.getElementById('dashboardSection').classList.remove('hidden');
+                loadReports();
+            } else {
+                loginMsg.textContent = "Incorrect password.";
+                loginMsg.className = "msg error";
+                document.getElementById('devPassword').value = "";
+            }
+        });
+
+        // 3. "Back to Report" / "Log Out" buttons clicked
+        document.querySelectorAll("button.secondary").forEach(btn => {
+            // Only attach to buttons that are meant to take the user back
+            if (btn.textContent.includes("Back") || btn.textContent.includes("Log Out")) {
+                btn.removeAttribute("onclick"); // Clean old attribute if still there
+                btn.addEventListener("click", () => {
+                    document.getElementById('loginSection').classList.add('hidden');
+                    document.getElementById('dashboardSection').classList.add('hidden');
+                    document.getElementById('reportSection').classList.remove('hidden');
+                    document.getElementById('formMsg').className = "msg";
+                });
+            }
+        });
+
+        // --- CORE FUNCTIONALITY ---
+
+        // Handle Report Submission
+        document.getElementById('reportForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value.trim().toLowerCase();
+            const message = document.getElementById('message').value.trim();
+            const formMsg = document.getElementById('formMsg');
+            
+            formMsg.className = "msg"; 
+            
+            const today = new Date().toISOString().split('T')[0];
+            const dailyTracker = `${today}_${email}`;
+
+            try {
+                await addDoc(collection(db, "reports"), {
+                    email: email,
+                    message: message,
+                    timestamp: new Date(),
+                    dailyTracker: dailyTracker 
+                });
+
+                formMsg.textContent = "Thank you! Your report has been submitted.";
+                formMsg.classList.add("success");
+                document.getElementById('reportForm').reset();
+            } catch (error) {
+                console.error(error);
+                formMsg.textContent = "Error submitting report. You may have already submitted a report today.";
+                formMsg.classList.add("error");
+            }
+        });
+
+        // Fetch and display reports for Dev
+        async function loadReports() {
+            const listDiv = document.getElementById('reportsList');
+            listDiv.innerHTML = "Loading...";
+            
+            try {
+                const q = query(collection(db, "reports"), orderBy("timestamp", "desc"));
+                const querySnapshot = await getDocs(q);
+                
+                if (querySnapshot.empty) {
+                    listDiv.innerHTML = "<p>No reports found.</p>";
+                    return;
+                }
+
+                listDiv.innerHTML = "";
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const date = data.timestamp?.toDate ? data.timestamp.toDate().toLocaleString() : 'Unknown date';
+                    
+                    const item = document.createElement('div');
+                    item.className = 'report-item';
+                    item.innerHTML = `
+                        <strong>From:</strong> ${escapeHtml(data.email)}<br>
+                        <strong>Message:</strong> ${escapeHtml(data.message)}
+                        <div class="meta">Submitted: ${date}</div>
+                    `;
+                    listDiv.appendChild(item);
+                });
+            } catch (error) {
+                console.error(error);
+                listDiv.innerHTML = "<p class='msg error'>Failed to load reports. Check Firestore permissions.</p>";
+            }
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        }
+    </script>
+
+
