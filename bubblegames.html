@@ -485,7 +485,7 @@
           } catch(e) { console.error("Cloud fetch failed, game will load locally", e); }
       }
 
-      showLoader("Spinning up engine…");
+      showLoader("Loading engine…");
 
       if (/<head[^>]*>/i.test(htmlText)) htmlText = htmlText.replace(/(<head[^>]*>)/i, `$1\n${injectedScript}`);
       else if (/<html[^>]*>/i.test(htmlText)) htmlText = htmlText.replace(/(<html[^>]*>)/i, `$1\n<head>\n${injectedScript}\n</head>\n`);
@@ -499,7 +499,7 @@
           if(loaderUI.style.display !== "none") {
             hideLoader();
             placeholder.style.display = "flex";
-            placeholder.textContent = "Engine Load Timeout. Check game code.";
+            placeholder.textContent = "Engine Load Timeout. Please Try Again.";
           }
       }, 5000);
     }
@@ -676,7 +676,7 @@
       else if (game.aspectRatio === 2) gameFrame.classList.add('ratio-16-9');
       else gameFrame.classList.add('ratio-freeform');
 
-      showLoader("Fetching raw file from JSdelivr…");
+      showLoader("Fetching…");
 
       try {
         const response = await fetch(game.url);
